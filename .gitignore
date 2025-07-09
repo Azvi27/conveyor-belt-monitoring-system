@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+*.egg-info/
+
+# Database
+*.sqlite3
+db.sqlite3
+
+# File Environment (untuk menyimpan data sensitif)
+.env
+
+# File sistem operasi
+.DS_Store
+Thumbs.db

@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Conveyor Monitoring Display</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @font-face {
+            font-family: "Rounded Mplus 1c Bold";
+            font-style: normal;
+            font-weight: 700;
+            src: url('https://anima-uploads.s3.amazonaws.com/projects/6070cab4d792a714f6f3f671/fonts/mplusrounded1c-bold.ttf') format("truetype");
+        }
+
+        /* Custom button styles for interactive elements */
+        .toggle-btn {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 65px;
+            border: 2px solid transparent;
+        }
+
+        /* ON Button States */
+        .toggle-btn.on-btn.active {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border-color: transparent;
+        }
+
+        .toggle-btn.on-btn.inactive {
+            background: transparent;
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .toggle-btn.on-btn.inactive:hover {
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        /* OFF Button States */
+        .toggle-btn.off-btn.active {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border-color: transparent;
+        }
+
+        .toggle-btn.off-btn.inactive {
+            background: transparent;
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .toggle-btn.off-btn.inactive:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        /* Reset Button */
+        .reset-btn {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: white;
+            padding: 8px 24px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width : 50%;
+        }
+
+        .reset-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .reset-btn:disabled {
+            opacity: 0.6;
+            transform: none;
+            cursor: not-allowed;
+        }
+
+        /* Status indicator */
+        .status-indicator {
+            transition: opacity 0.5s ease;
+        }
+
+        /* Pulse animation for active status - DIPERLAMBAT */
+        .status-running {
+            animation: pulse 4s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        /* Value update animation - HANYA UNTUK USER ACTION */
+        .value-updated {
+            animation: valueFlash 0.6s ease;
+        }
+
+        @keyframes valueFlash {
+            0% { background-color: transparent; }
+            50% { background-color: rgba(34, 197, 94, 0.3); }
+            100% { background-color: transparent; }
+        }
+
+        /* Connection status indicator */
+        .connection-dot {
+            transition: all 0.3s ease;
+        }
+
+        .connection-dot.connected {
+            background-color: #10b981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: connectionPulse 2s infinite;
+        }
+
+        .connection-dot.disconnected {
+            background-color: #ef4444;
+            animation: none;
+        }
+
+        @keyframes connectionPulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Smooth transitions for all value updates */
+        .metric-value {
+            transition: color 0.3s ease;
+        }
+
+        /* Error state styling */
+        .error-state {
+            color: #ef4444;
+            font-style: italic;
+        }
+
+        /* Button loading state */
+        .btn-loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body class="bg-[#f1ecf2] font-sans max-h-screen max-w-screen overflow-y-scroll md:overflow-hidden">
+    
+    <!-- Header Section -->
+    <div class="bg-blue-50 p-4 flex items-center justify-between md:h-20 relative">
+        <!-- Left: Logo and Vendor -->
+        <div class="flex items-center gap-2 md:ml-8">
+            <div class="grid grid-cols-2 gap-0.5 w-5 h-5 md:w-8 md:h-8">
+                <div class="bg-gradient-to-b from-blue-400 to-blue-700 rounded-sm"></div>
+                <div class="bg-gradient-to-b from-blue-400 to-blue-700 rounded-sm"></div>
+                <div class="bg-gradient-to-b from-blue-400 to-blue-700 rounded-sm"></div>
+                <div class="bg-gradient-to-b from-blue-400 to-blue-700 rounded-sm"></div>
+            </div>
+            <span class="text-[7px] md:text-2xl font-semibold bg-gradient-to-r from-cyan-400 to-cyan-800 bg-clip-text text-transparent md:ml-4">
+                Vendor Betta
+            </span>
+        </div>
+
+        <!-- Center: Title -->
+        <div class="absolute left-1/2 transform -translate-x-1/2 text-cyan-600 font-semibold text-[10px] md:text-3xl whitespace-nowrap">
+            Conveyor Monitoring System
+        </div>
+
+        <!-- Right: Connection Status -->
+        <div class="w-12 md:w-[200px] flex justify-end">
+            <div id="connection-status" class="flex items-center gap-2 text-xs md:text-sm">
+                <div id="status-dot" class="w-2 h-2 md:w-3 md:h-3 rounded-full connection-dot disconnected"></div>
+                <span id="status-text" class="text-red-600 font-medium">Connecting...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Safety System Section (Desktop Only) -->
+    <div class="flex gap-4 p-4 rounded-lg h-36 items-center hidden md:flex">
+        <!-- Safety System Title -->
+        <div class="text-right pr-4">
+            <p class="text-3xl font-semibold text-cyan-700 leading-tight">SAFETY<br>SYSTEM</p>
+        </div>
+
+        <!-- Safety System Cards -->
+        <div class="flex flex-wrap gap-4 w-full h-full justify-around">
+            <!-- Vibration Level Card -->
+            <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-[23%] shadow flex flex-col justify-between h-full">
+                <p class="text-lg text-white">Vibration Level</p>
+                <p id="vibration-desktop" class="text-4xl font-semibold metric-value">--</p>
+            </div>
+
+            <!-- Motor Voltage Card -->
+            <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-[23%] shadow flex flex-col justify-between h-full">
+                <p class="text-lg text-white">Motor Voltage</p>
+                <div class="flex justify-between items-end">
+                    <p id="voltage-desktop" class="text-4xl font-semibold metric-value">--</p>
+                    <span class="text-lg font-semibold">Volt</span>
+                </div>
+            </div>
+
+            <!-- Motor Current Card -->
+            <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-[23%] shadow flex flex-col justify-between h-full">
+                <p class="text-lg text-white">Motor Current</p>
+                <div class="flex justify-between items-end">
+                    <p id="current-desktop" class="text-4xl font-semibold metric-value">--</p>
+                    <span class="text-lg font-semibold">Ampere</span>
+                </div>
+            </div>
+
+            <!-- Power Consumption Card -->
+            <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-[23%] shadow flex flex-col justify-between h-full">
+                <p class="text-lg text-white">Power Consumption</p>
+                <div class="flex justify-between items-end">
+                    <p id="power-desktop" class="text-4xl font-semibold metric-value">--</p>
+                    <span class="text-lg font-semibold">kW</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="bg-[#f3edf5] px-2 md:px-6 rounded-lg flex flex-col md:flex-row gap-6 h-96">
+        
+        <!-- Left Section: Conveyor Information -->
+        <div class="bg-white p-2 md:p-6 rounded-lg flex-1 flex flex-col md:gap-6">
+            
+            <!-- Conveyor Status and Info -->
+            <div class="flex">
+                <div class="grid grid-cols-5 gap-2 md:gap-6 w-full items-start">
+                    <!-- Running Status Button -->
+                    <button id="status-button" class="bg-cyan-800 mr-4 md:mr-12 text-white font-bold px-1 py-0.5 md:py-3 md:px-4 md:py-1 rounded text-[8px] md:text-lg transition-all duration-300">
+                        Connecting...
+                    </button>
+                    
+                    <!-- Belt Type -->
+                    <div>
+                        <p class="text-[8px] md:text-lg">Belt Type</p>
+                        <p class="text-[8px] md:text-lg font-light text-gray-500">Single Belt</p>
+                    </div>
+                    
+                    <!-- Motor -->
+                    <div>
+                        <p class="text-[8px] md:text-lg">Motor</p>
+                        <p class="text-[8px] md:text-lg font-light text-gray-500">Stepper</p>
+                    </div>
+                    
+                    <!-- Section Length -->
+                    <div>
+                        <p class="text-[8px] md:text-lg">Section Length</p>
+                        <p class="text-[8px] md:text-lg font-light text-gray-500">50 cm</p>
+                    </div>
+                    
+                    <!-- Belt Material -->
+                    <div>
+                        <p class="text-[8px] md:text-lg">Belt Material</p>
+                        <p class="text-[8px] md:text-lg font-light text-gray-500">Plastic</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Conveyor Image and Data Panel -->
+            <div class="flex gap-4">
+                <!-- Conveyor Image -->
+                <img id="conveyor-image" 
+                     src="https://cdn.animaapp.com/projects/6805a2b17897c84a049b65e9/releases/6827357df169dab3b2875fca/img/screenshot-2025-05-15-183002-removebg-preview-1.png" 
+                     class="w-full md:max-w-[350px] mx-auto status-indicator" />
+                
+                <!-- Data Panel (Desktop Only) -->
+                <div class="space-y-4 hidden md:block w-[25%] h-full">
+                    <!-- Mass Card -->
+                    <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md text-center shadow flex flex-col justify-between h-[45%]">
+                        <p class="text-lg text-white/70">Mass</p>
+                        <p id="mass-desktop" class="text-3xl font-semibold metric-value">--</p>
+                        <p class="text-sm font-normal">Gram</p>
+                    </div>
+                    
+                    <!-- Brightness Card -->
+                    <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md text-center flex flex-col justify-between shadow h-[45%]">
+                        <p class="text-lg text-white/70">Brightness</p>
+                        <p id="brightness-desktop" class="text-3xl font-semibold metric-value">--</p>
+                        <p class="text-sm font-normal">Lux</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Section: Control Panel -->
+        <div class="flex flex-col gap-4 w-full md:w-[300px] mt-2 md:mt-0 border">
+            
+            <!-- Control System -->
+            <div class="bg-white w-full p-4 rounded-lg shadow border-4 border-cyan-900 md:border-0">
+                <p class="font-semibold mb-2 text-center">Control System</p>
+                
+                <!-- Power System Controls -->
+                <div class="flex justify-between items-center text-sm mb-1">
+                    <p>Power System</p>
+                    <div class="flex gap-2 md:gap-1 w-[50%] justify-between">
+                        <button id="on-button" class="toggle-btn on-btn inactive" onclick="togglePower(true)">ON</button>
+                        <button id="off-button" class="toggle-btn off-btn inactive" onclick="togglePower(false)">OFF</button>
+                    </div>
+                </div>
+                
+                <!-- Reset Count -->
+                <div class="flex justify-between items-center text-sm mt-2">
+                    <p>Reset Count</p>
+                    <button id="reset-button" class="reset-btn" onclick="resetCount()">RESET</button>
+                </div>
+            </div>
+
+            <!-- Data Product -->
+            <div class="bg-cyan-100 p-4 rounded-lg shadow">
+                <p class="font-semibold text-center mb-2">Data Product</p>
+                <div class="flex justify-between px-2">
+                    <!-- Good Products -->
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500">Good Products</p>
+                        <p id="good-products" class="text-2xl font-semibold text-slate-800 metric-value">--</p>
+                    </div>
+                    
+                    <!-- Divider -->
+                    <div class="border-l border-gray-300 mx-4"></div>
+                    
+                    <!-- Bad Products -->
+                    <div class="text-center">
+                        <p class="text-xs text-gray-500">Bad Products</p>
+                        <p id="bad-products" class="text-2xl font-semibold text-slate-800 metric-value">--</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Panel (Mobile Only) -->
+            <div class="block md:hidden flex flex-row justify-around gap-2">
+                <!-- Mass Card Mobile -->
+                <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md text-center w-full shadow">
+                    <p class="text-xs text-white/70">Mass</p>
+                    <p id="mass-mobile" class="text-3xl font-semibold metric-value">--</p>
+                    <p class="text-sm font-normal">Gram</p>
+                </div>
+                
+                <!-- Brightness Card Mobile -->
+                <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md text-center shadow w-full">
+                    <p class="text-xs text-white/70">Brightness</p>
+                    <p id="brightness-mobile" class="text-3xl font-semibold metric-value">--</p>
+                    <p class="text-sm font-normal">Lux</p>
+                </div>
+            </div>
+
+            <!-- Safety System (Mobile Only) -->
+            <div class="flex flex-col gap-4 w-full h-full block md:hidden">
+                <!-- Safety System Title Mobile -->
+                <div class="text-center pr-4">
+                    <p class="text-3xl font-semibold text-cyan-700 leading-tight">SAFETY SYSTEM</p>
+                </div>
+                
+                <!-- Vibration Level Card Mobile -->
+                <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-full shadow flex flex-col justify-between h-full">
+                    <p class="text-sm text-white">Vibration Level</p>
+                    <p id="vibration-mobile" class="text-3xl font-semibold text-white metric-value">--</p>
+                </div>
+
+                <!-- Motor Voltage Card Mobile -->
+                <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-full shadow flex flex-col justify-between h-full">
+                    <p class="text-sm text-white">Motor Voltage</p>
+                    <div class="flex justify-between items-end">
+                        <p id="voltage-mobile" class="text-3xl font-semibold metric-value">--</p>
+                        <span class="text-lg font-semibold">Volt</span>
+                    </div>
+                </div>
+
+                <!-- Motor Current Card Mobile -->
+                <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-full shadow flex flex-col justify-between h-full">
+                    <p class="text-sm text-white">Motor Current</p>
+                    <div class="flex justify-between items-end">
+                        <p id="current-mobile" class="text-3xl font-semibold metric-value">--</p>
+                        <span class="text-lg font-semibold">Ampere</span>
+                    </div>
+                </div>
+
+                <!-- Power Consumption Card Mobile -->
+                <div class="bg-gradient-to-r from-cyan-900 to-blue-500 text-white p-4 rounded-md w-full shadow flex flex-col justify-between h-full">
+                    <p class="text-sm text-white">Power Consumption</p>
+                    <div class="flex justify-between items-end">
+                        <p id="power-mobile" class="text-3xl font-semibold metric-value">--</p>
+                        <span class="text-lg font-semibold">kW</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Last Update -->
+            <div class="bg-white p-4 rounded-lg shadow h-full text-center flex flex-col items-center justify-center gap-y-4">
+                <p class="font-semibold text-xl mb-2 text-center">Last Update</p>
+                <div class="flex gap-6 justify-between">
+                    <!-- Date -->
+                    <div class="flex items-center gap-2 text-sm">
+                        <span>📅</span>
+                        <p id="last-date">--</p>
+                    </div>
+                    
+                    <!-- Time -->
+                    <div class="flex items-center gap-2 text-sm mt-1">
+                        <span>⏰</span>
+                        <p id="last-time">--</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for Dynamic Functionality -->
+    <script>
+        // Global state
+        let isConnected = false;
+        let currentPowerStatus = false;
+        let lastUpdateTime = null;
+        let pollingInterval = null;
+
+        // Function to display value or "--" if null, undefined, or negative
+        function displayValue(value) {
+            // If value is a negative number, display as "--"
+            if (typeof value === 'number' && value < 0) {
+                return "--";
+            }
+            
+            // If null, undefined, or empty string, display as "--"
+            if (value === null || value === undefined || value === "") {
+                return "--";
+            }
+            
+            // If it's a number, format to 2 decimal places and remove trailing zeros
+            if (typeof value === 'number') {
+                return parseFloat(value.toFixed(2)).toString();
+            }
+            
+            // If it's a string that can be converted to number
+            const numValue = parseFloat(value);
+            if (!isNaN(numValue)) {
+                return parseFloat(numValue.toFixed(2)).toString();
+            }
+            
+            // Return as is for non-numeric values
+            return value;
+        }
+
+        // Function to update element WITHOUT animation (for regular updates)
+        function updateElement(elementId, newValue) {
+            const element = document.getElementById(elementId);
+            if (element && element.textContent !== newValue) {
+                element.textContent = newValue;
+            }
+        }
+
+        // Function to update element WITH animation (for user actions only)
+        function updateElementWithAnimation(elementId, newValue) {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.textContent = newValue;
+                element.classList.add('value-updated');
+                setTimeout(() => {
+                    element.classList.remove('value-updated');
+                }, 600);
+            }
+        }
+
+        // Function to update connection status
+        function updateConnectionStatus(connected) {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            
+            if (connected) {
+                statusDot.className = 'w-2 h-2 md:w-3 md:h-3 rounded-full connection-dot connected';
+                statusText.textContent = 'Connected';
+                statusText.className = 'text-green-600 font-medium';
+            } else {
+                statusDot.className = 'w-2 h-2 md:w-3 md:h-3 rounded-full connection-dot disconnected';
+                statusText.textContent = 'Disconnected';
+                statusText.className = 'text-red-600 font-medium';
+            }
+            isConnected = connected;
+        }
+
+        // Function to update power button UI based on status
+        function updatePowerButtonsUI(status, overrideActive = false) {
+            const onButton = document.getElementById('on-button');
+            const offButton = document.getElementById('off-button');
+            const statusButton = document.getElementById('status-button');
+            const conveyorImage = document.getElementById('conveyor-image');
+            
+            currentPowerStatus = status;
+            
+            // If override is active, all buttons become inactive
+            if (overrideActive) {
+                onButton.className = 'toggle-btn on-btn inactive';
+                offButton.className = 'toggle-btn off-btn inactive';
+                statusButton.textContent = "Override";
+                statusButton.className = "bg-yellow-600 mr-4 md:mr-12 text-white font-bold px-1 py-0.5 md:py-3 md:px-4 md:py-1 rounded text-[8px] md:text-lg transition-all duration-300";
+                conveyorImage.style.opacity = "0.5";
+                return;
+            }
+            
+            if (status) {
+                // System ON
+                onButton.className = 'toggle-btn on-btn active';
+                offButton.className = 'toggle-btn off-btn inactive';
+                statusButton.textContent = "Running";
+                statusButton.className = "bg-green-600 mr-4 md:mr-12 text-white font-bold px-1 py-0.5 md:py-3 md:px-4 md:py-1 rounded text-[8px] md:text-lg transition-all duration-300";
+                conveyorImage.style.opacity = "1";
+                conveyorImage.classList.add('status-running');
+            } else {
+                // System OFF
+                onButton.className = 'toggle-btn on-btn inactive';
+                offButton.className = 'toggle-btn off-btn active';
+                statusButton.textContent = "Stopped";
+                statusButton.className = "bg-red-600 mr-4 md:mr-12 text-white font-bold px-1 py-0.5 md:py-3 md:px-4 md:py-1 rounded text-[8px] md:text-lg transition-all duration-300";
+                conveyorImage.style.opacity = "0.5";
+                conveyorImage.classList.remove('status-running');
+            }
+        }
+
+        // Function to get CSRF token from cookie
+        function getCsrfToken() {
+            const name = 'csrftoken';
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Function to fetch data from API - OPTIMIZED WITHOUT LOADING STATE
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/latest-data/');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Update connection status
+                updateConnectionStatus(true);
+                
+                // Get data from response
+                const sensor = data.sensor;
+                const power = data.power;
+                const productCounts = data.product_counts;
+
+                // Update vibration status (special handling for boolean value)
+                const vibrationStatus = power.vibration !== null && power.vibration !== undefined
+                    ? (power.vibration ? "Safe" : "Warning")
+                    : "--";
+                
+                // Update all values WITHOUT animations (smooth updates)
+                updateElement("vibration-desktop", vibrationStatus);
+                updateElement("vibration-mobile", vibrationStatus);
+                updateElement("voltage-desktop", displayValue(power.voltage));
+                updateElement("voltage-mobile", displayValue(power.voltage));
+                updateElement("current-desktop", displayValue(power.current));
+                updateElement("current-mobile", displayValue(power.current));
+                updateElement("power-desktop", displayValue(power.power_consumption));
+                updateElement("power-mobile", displayValue(power.power_consumption));
+                updateElement("mass-desktop", displayValue(sensor.mass));
+                updateElement("mass-mobile", displayValue(sensor.mass));
+                updateElement("brightness-desktop", displayValue(sensor.brightness));
+                updateElement("brightness-mobile", displayValue(sensor.brightness));
+                
+                // Update product counters
+                updateElement("good-products", productCounts.good_product !== null 
+                    ? productCounts.good_product 
+                    : "--");
+                updateElement("bad-products", productCounts.bad_product !== null 
+                    ? productCounts.bad_product 
+                    : "--");
+                
+                // Update button UI based on power status and override
+                updatePowerButtonsUI(power.status, power.override_active);
+                
+                // Update timestamp with formatted date
+                const timestamp = new Date(power.timestamp);
+                lastUpdateTime = timestamp;
+                
+                // Format date and time separately
+                const dateOptions = { 
+                    year: 'numeric', 
+                    month: 'short', 
+                    day: 'numeric'
+                };
+                const timeOptions = { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit',
+                    hour12: false
+                };
+                
+                updateElement("last-date", timestamp.toLocaleDateString('id-ID', dateOptions));
+                updateElement("last-time", timestamp.toLocaleTimeString('id-ID', timeOptions));
+                
+            } catch (err) {
+                console.error("Polling error:", err);
+                updateConnectionStatus(false);
+                
+                // Show error state in UI
+                const errorMessage = "--";
+                const errorElements = [
+                    'vibration-desktop', 'vibration-mobile',
+                    'voltage-desktop', 'voltage-mobile',
+                    'current-desktop', 'current-mobile',
+                    'power-desktop', 'power-mobile',
+                    'mass-desktop', 'mass-mobile',
+                    'brightness-desktop', 'brightness-mobile',
+                    'good-products', 'bad-products'
+                ];
+                
+                errorElements.forEach(elementId => {
+                    const element = document.getElementById(elementId);
+                    if (element && element.textContent !== errorMessage) {
+                        element.textContent = errorMessage;
+                        element.classList.add('error-state');
+                    }
+                });
+                
+                updateElement("last-date", "Connection Error");
+                updateElement("last-time", "Retrying...");
+            }
+        }
+
+        // Function to toggle power status
+        async function togglePower(status) {
+            console.log(status ? "System ON" : "System OFF");
+            
+            // Disable buttons during request
+            const onButton = document.getElementById('on-button');
+            const offButton = document.getElementById('off-button');
+            
+            onButton.classList.add('btn-loading');
+            offButton.classList.add('btn-loading');
+            
+            // Update UI before request for better responsiveness
+            updatePowerButtonsUI(status);
+            
+            try {
+                const response = await fetch('/api/power-command/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({
+                        status: status ? 1 : 0,
+                        timestamp: new Date().toISOString(),
+                        voltage: 0,
+                        vibration: true,
+                        current: 0,
+                        power_consumption: 0
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log("Power status changed:", data);
+                
+                // Refresh data after successful change
+                await fetchData();
+                
+            } catch (err) {
+                console.error("Error changing power status:", err);
+                
+                // Revert UI to previous status on error
+                updatePowerButtonsUI(currentPowerStatus);
+                
+                // Show user-friendly error message
+                alert("Failed to change power status. Please check your connection and try again.");
+                
+            } finally {
+                // Re-enable buttons
+                onButton.classList.remove('btn-loading');
+                offButton.classList.remove('btn-loading');
+            }
+        }
+
+        // Function to reset counters
+        async function resetCount() {
+            console.log("Reset Count");
+            
+            // Disable reset button during request
+            const resetButton = document.getElementById('reset-button');
+            resetButton.disabled = true;
+            resetButton.textContent = 'Resetting...';
+            resetButton.classList.add('btn-loading');
+            
+            try {
+                const response = await fetch('/api/resetcount/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken()
+                    },
+                    body: JSON.stringify({ reset: true })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log("Counters reset:", data);
+                
+                // Use animation for reset counter (user action)
+                if (data.product_counts) {
+                    updateElementWithAnimation("good-products", data.product_counts.good_product !== null 
+                        ? data.product_counts.good_product 
+                        : "0");
+                    updateElementWithAnimation("bad-products", data.product_counts.bad_product !== null 
+                        ? data.product_counts.bad_product 
+                        : "0");
+                } else {
+                    updateElementWithAnimation("good-products", "0");
+                    updateElementWithAnimation("bad-products", "0");
+                }
+                
+                // Refresh data after successful reset
+                await fetchData();
+                
+            } catch (err) {
+                console.error("Error resetting counters:", err);
+                alert("Failed to reset counters. Please check your connection and try again.");
+                
+            } finally {
+                // Re-enable reset button
+                resetButton.disabled = false;
+                resetButton.textContent = 'RESET';
+                resetButton.classList.remove('btn-loading');
+            }
+        }
+
+        // Start polling function
+        function startPolling() {
+            // Stop existing polling if any
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // Initial fetch
+            fetchData();
+            
+            // Set polling interval - REDUCED to 3 seconds for better performance
+            pollingInterval = setInterval(fetchData, 3000);
+        }
+
+        // Stop polling function
+        function stopPolling() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+        }
+
+        // Initialize the application
+        function initApp() {
+            console.log("Conveyor Monitoring System initialized");
+            
+            // Initialize UI state
+            updateConnectionStatus(false);
+            updatePowerButtonsUI(false);
+            
+            // Start polling
+            startPolling();
+        }
+
+        // Start the application when DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // Handle page visibility change to pause/resume polling  
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                console.log("Page visible, resuming polling");
+                startPolling();
+            } else {
+                console.log("Page hidden, pausing polling");
+                stopPolling();
+            }
+        });
+
+        // Handle online/offline events
+        window.addEventListener('online', function() {
+            console.log("Connection restored");
+            startPolling();
+        });
+
+        window.addEventListener('offline', function() {
+            console.log("Connection lost");
+            updateConnectionStatus(false);
+            stopPolling();
+        });
+    </script>
+
+</body>
+</html>
