@@ -2,6 +2,13 @@
 
 Sistem monitoring dan kontrol conveyor belt berbasis web yang terintegrasi dengan hardware Raspberry Pi untuk monitoring real-time dan quality control produk industri.
 
+## Tampilan Dashboard
+![Foto Tampilan Dashboard](docs/Dashboard.jpg)
+*Tampilan dashboard sebelum terhubung Raspi*
+
+![Foto Perangkat Keras](docs/LED_UV.jpg)
+*LED UV Hardware*
+
 ## 🚀 Fitur Utama
 
 ### Real-time Monitoring
