@@ -9,7 +9,7 @@ Sistem monitoring dan kontrol conveyor belt berbasis web yang terintegrasi denga
 ![Foto Tampilan Dashboard](Docs/Terhubung_Rasberry_Pi.jpg)
 *Tampilan dashboard sebelum terhubung Raspi*
 
-![Foto Data Rasberry Pi](Docs/Pengiriman_Data.jpg)
+![Foto Data Rasberry Pi](Docs/Data.jpg)
 *Pengiriman Data dari Rasberry PI*
 
 ## 🚀 Fitur Utama
